@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  TwingateNetworkAddress:
+    Type: String
+  ConnectorName:
+    Type: String
+  ConnectorAccessToken:
+    Type: String
+  ConnectorRefreshToken:
+    Type: String
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  InstanceType:
+    Type: String
+    Default: t3a.micro
+    AllowedValues:
+      - t3.micro
+      - t2.micro
+      - t3a.micro
+  SshKey:
+    Type: AWS::EC2::KeyPair::KeyName
+  AmiId:
+    Type: AWS::EC2::Image::Id
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      SubnetId: !Ref SubnetId
+      InstanceType: !Ref InstanceType
+      Tags:
+        - Key: Name
+          Value: !Ref ConnectorName
+      KeyName: !Ref SshKey
+      UserData:
+        Fn::Base64: !Sub |
+          #! /bin/bash
+          sudo mkdir -p /etc/twingate/
+          HOSTNAME_LOOKUP=$(curl http://169.254.169.254/latest/meta-data/local-hostname)
+          {
+          echo TWINGATE_URL=https://${TwingateNetworkAddress}
+          echo TWINGATE_ACCESS_TOKEN=${ConnectorAccessToken}
+          echo TWINGATE_REFRESH_TOKEN=${ConnectorRefreshToken}
+          echo TWINGATE_LABEL_HOSTNAME=$HOSTNAME_LOOKUP
+          echo TWINGATE_LABEL_DEPLOYEDBY=cloudformation
+          } > /etc/twingate/connector.conf
+          sudo systemctl enable --now twingate-connector
